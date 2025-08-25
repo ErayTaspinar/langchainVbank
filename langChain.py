@@ -38,7 +38,6 @@ class GoogleSearchRAGInput(BaseModel):
         description="Number of search results to retrieve (max 10)"
     )
 
-
 class GoogleSearchRAGTool(BaseTool):
     """Tool for web search using Google Custom Search API with RAG capabilities."""
     name: str = "google_search_rag"
@@ -255,12 +254,6 @@ class StackExchangeTool(BaseTool):
 
 
 # --- INTERNAL KNOWLEDGE SEARCH TOOL DEFINITION ---
-
-class InternalKnowledgeSearchInput(BaseModel):
-    """Input schema for the Internal Knowledge Search tool."""
-    query: str = Field(description="The user's technical or programming question.")
-    n_results: int = Field(default=3, description="The number of relevant documents to retrieve.")
-
 
 class InternalKnowledgeSearchInput(BaseModel):
     """Input schema for the Internal Knowledge Search tool."""

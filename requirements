@@ -1,0 +1,9 @@
+requests
+openai
+pydantic
+langchain
+langchain-core
+langchain-openai
+langgraph
+chromadb
+python-dotenv

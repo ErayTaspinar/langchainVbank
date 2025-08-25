@@ -1,0 +1,5 @@
+These keys needed for code to work
+OPENROUTER_API_KEY = OpenRouter website API key
+STACK_EXCHANGE_API_KEY = StackExchange API key
+SEARCH_ENGINE_ID =  Google Provided engine ID
+GOOGLE_API_KEY = Google search API key
