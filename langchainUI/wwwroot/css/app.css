@@ -1,0 +1,50 @@
+/* This is the full-screen, semi-transparent background */
+.modal-overlay {
+    position: fixed; /*  This is the key: it removes the element from the page flow and positions it relative to the browser window. */
+    top: 0;
+    left: 0;
+    width: 100vw; /*  vw = viewport width */
+    height: 100vh; /* vh = viewport height */
+    background-color: rgba(0, 0, 0, 0.6); /* Black with 60% opacity */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 999; /*  Ensures the overlay is on top of all other content */
+}
+
+/* This is the white box that holds your content (Login/Register form) */
+.modal-dialog {
+    background: white;
+    border-radius: 15px;
+    box-shadow: 0 5px 20px rgba(0, 0, 0, 0.2);
+    padding: 2rem;
+    max-width: 500px; /* Adjust the max width as you like */
+    width: 90%; /* Responsive width */
+    z-index: 1000; /*  Must be higher than the overlay's z-index */
+}
+
+/* Optional: Styles for the header and close button to make them look nice */
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #dee2e6;
+    padding-bottom: 1rem;
+    margin-bottom: 1rem;
+}
+
+.modal-title {
+    font-size: 1.5rem;
+    font-weight: 500;
+}
+
+.modal-close {
+    border: none;
+    background: transparent;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #6c757d;
+}
+
+.modal-body {
+}

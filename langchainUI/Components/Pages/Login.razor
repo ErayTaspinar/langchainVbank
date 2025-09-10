@@ -1,0 +1,65 @@
+@inject DatabaseService DbService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject NavigationManager Navigation 
+@inject IJSRuntime JSRuntime
+
+<h3>Login</h3>
+
+<div class="mb-3">
+    <input class="form-control" @bind="Email" placeholder="Email" />
+</div>
+<div class="mb-3">
+    <input class="form-control" @bind="Password" type="password" placeholder="Password" />
+</div>
+<button class="btn btn-primary" @onclick="LoginUser">Login</button>
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <p class="mt-3 text-danger">@Message</p>
+}
+
+@code {
+    [Parameter]
+    public EventCallback OnLoginSuccess { get; set; }
+
+    private string Email = "";
+    private string Password = "";
+    private string Message = "";
+
+    private async Task LoginUser()
+    {
+        try
+        {
+            Message = "";
+
+            var userExists = await DbService.UserExists(Email);
+            
+            if (!userExists)
+            {
+                await JSRuntime.InvokeVoidAsync("console.log", $"User does not exist: {Email}");
+                Message = "User not found. Please check your email address.";
+                return;
+            }
+            var isValid = await DbService.ValidateUser(Email, Password);
+            
+            if (isValid)
+            {
+                await JSRuntime.InvokeVoidAsync("console.log", $"Login successful for: {Email}");
+                
+                var authProvider = (CustomAuthStateProvider)AuthenticationStateProvider;
+                authProvider.NotifyUserAuthentication(Email);
+                
+                await OnLoginSuccess.InvokeAsync();
+            }
+            else
+            {
+                Message = "Invalid password. Please try again.";
+            }
+        }
+        
+        catch (Exception ex)
+        {
+            Message = "An error occurred during login. Please try again.";
+        }
+    }
+}

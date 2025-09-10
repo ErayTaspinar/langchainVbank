@@ -1,0 +1,46 @@
+@inject DatabaseService DbService
+
+<h3>Register</h3>
+
+<div class="mb-3">
+    <input class="form-control" @bind="Email" placeholder="Email" />
+</div>
+<div class="mb-3">
+    <input class="form-control" @bind="Password" type="password" placeholder="Password" />
+</div>
+<button class="btn btn-primary" @onclick="RegisterUser">Register</button>
+
+@if (!string.IsNullOrEmpty(Message))
+{
+    <p class="mt-3 @MessageClass">@Message</p>
+}
+
+@code {
+    private string Email = "";
+    private string Password = "";
+    private string Message = "";
+    private string MessageClass = "text-danger";
+
+    private async Task RegisterUser()
+    {
+        if (string.IsNullOrWhiteSpace(Email) || string.IsNullOrWhiteSpace(Password))
+        {
+            Message = "Email and password are required.";
+            MessageClass = "text-danger";
+            return;
+        }
+
+        var success = await DbService.RegisterUser(Email, Password);
+        
+        if (success)
+        {
+            Message = "Registration successful! You can now log in.";
+            MessageClass = "text-success";
+        }
+        else
+        {
+            Message = "Registration failed! This email may already be in use.";
+            MessageClass = "text-danger";
+        }
+    }
+}
