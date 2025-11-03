@@ -29,10 +29,8 @@
         </aside>
     }
 
-    <!-- 2. Main Chat Area -->
     <div class="chat-container">
         <header class="top-header">
-            <!-- Logo has been removed from here -->
             <div class="header-content">
                 <div class="auth-section">
                     @if (!_isAuthenticated)
@@ -46,7 +44,8 @@
                     }
                     else
                     {
-                        <button class="btn-ghost">Log out</button>
+                        <!-- ONLY CHANGE: added onclick to make logout functional -->
+                        <button class="btn-ghost" @onclick="Logout">Log out</button>
                     }
                 </div>
             </div>
@@ -102,12 +101,9 @@
     </ModalDialog>
 }
 
-
 <style>
-    /* Global Resets */
     * { margin: 0; padding: 0; box-sizing: border-box; }
 
-    /* Full Page Layout */
     .page-container {
         display: flex;
         height: 100vh;
@@ -129,7 +125,6 @@
         border-bottom: 1px solid #e5e5e5;
     }
     
-    /* Style for the container of the "New Chat" button */
     .sidebar-actions {
         padding: 1rem;
         border-bottom: 1px solid #e5e5e5;
@@ -176,7 +171,6 @@
         color: white;
     }
 
-    /* Chat Container Styles */
     .chat-container { 
         display: flex; 
         flex-direction: column; 
@@ -251,11 +245,8 @@
         var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
         _isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
 
-        // A conversation is always needed, whether logged in or out
         if (_conversations.Count == 0)
-        {
             StartNewConversation();
-        }
     }
 
     private void StartNewConversation()
@@ -280,9 +271,9 @@
         {
             _activeConversation.Title = _newMessage.Length > 25 ? _newMessage.Substring(0, 25) + "..." : _newMessage;
         }
-        
+
         _activeConversation.Messages.Add(userMessage);
-        
+
         var messageToSend = _newMessage;
         _newMessage = string.Empty;
         await InvokeAsync(StateHasChanged);
@@ -290,7 +281,7 @@
         await Task.Delay(500);
         var botMessage = new ChatMessage { Text = $"Simulated response to: '{messageToSend}'", IsUser = false };
         _activeConversation.Messages.Add(botMessage);
-        
+
         await InvokeAsync(StateHasChanged);
     }
 
@@ -303,13 +294,11 @@
             await InvokeAsync(() =>
             {
                 if (_disposed) return;
-                
-                // If the user's auth state has changed, update the UI
+
                 if (newIsAuthenticated != _isAuthenticated)
                 {
                     _isAuthenticated = newIsAuthenticated;
 
-                    // When a user logs in, ensure they have a fresh chat list
                     if (_isAuthenticated)
                     {
                         _conversations.Clear();
@@ -319,7 +308,7 @@
                 }
             });
         }
-        catch (ObjectDisposedException) { }
+        catch { }
     }
 
     private async Task HandleSendAttempt()
@@ -333,21 +322,27 @@
     {
         if (e.Key == "Enter") await HandleSendAttempt();
     }
-    
+
     private async Task HandleLoginSuccess()
     {
         CloseModal();
         if (!string.IsNullOrWhiteSpace(_newMessage)) await SendMessage();
     }
-    
+
     private void OpenModal(string content)
     {
         _modalContent = content;
         _modalTitle = content == "login" ? "Please log in to continue" : "Create an account to chat";
         _showModal = true;
     }
-    
+
     private void CloseModal() => _showModal = false;
+
+    private async Task Logout()
+    {
+        var authProvider = (CustomAuthStateProvider)AuthenticationStateProvider;
+        await authProvider.NotifyUserLogoutAsync();
+    }
 
     public void Dispose()
     {

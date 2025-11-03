@@ -13,7 +13,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("langchainUI")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+6c9f3547083f90991992fdc6eacd33e778bc3774")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+bda76da910908b6d4039ce54af17c6dc7989907a")]
 [assembly: System.Reflection.AssemblyProductAttribute("langchainUI")]
 [assembly: System.Reflection.AssemblyTitleAttribute("langchainUI")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]

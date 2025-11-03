@@ -1,34 +1,84 @@
 using System.Security.Claims;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Authorization;
+using Microsoft.JSInterop;
+using System.IdentityModel.Tokens.Jwt;
 
-namespace langchainUI.Services 
+namespace langchainUI.Services
 {
     public class CustomAuthStateProvider : AuthenticationStateProvider
     {
-        // This represents a user who is not logged in.
+        private readonly IJSRuntime _jsRuntime;
         private ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
 
-        // This is the main method that Blazor calls to check who is logged in.
-        public override async Task<AuthenticationState> GetAuthenticationStateAsync()
+        public CustomAuthStateProvider(IJSRuntime jsRuntime)
         {
-            return await Task.FromResult(new AuthenticationState(_anonymous));
+            _jsRuntime = jsRuntime;
         }
 
-        // We will call this method from our Login component when the user logs in successfully.
-        public void NotifyUserAuthentication(string email)
+        public override async Task<AuthenticationState> GetAuthenticationStateAsync()
         {
-            var identity = new ClaimsIdentity(new[]
+            try
             {
-                new Claim(ClaimTypes.Name, email),
-            }, "apiauth"); 
+                var accessToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "accessToken");
+                
+                if (string.IsNullOrWhiteSpace(accessToken))
+                    return new AuthenticationState(_anonymous);
 
+                var handler = new JwtSecurityTokenHandler();
+                var jwtToken = handler.ReadJwtToken(accessToken);
+
+                // Check if token is expired
+                if (jwtToken.ValidTo < DateTime.UtcNow)
+                {
+                    // Token expired, log out user
+                    await NotifyUserLogoutAsync();
+                    return new AuthenticationState(_anonymous);
+                }
+
+                var claims = new[]
+                {
+                    new Claim(ClaimTypes.Name, jwtToken.Subject ?? ""),
+                    new Claim(ClaimTypes.Role, jwtToken.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? "User"),
+                    new Claim("userId", jwtToken.Claims.FirstOrDefault(c => c.Type == "userId")?.Value ?? "")
+                };
+
+                var identity = new ClaimsIdentity(claims, "jwt");
+                var user = new ClaimsPrincipal(identity);
+
+                return new AuthenticationState(user);
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"GetAuthenticationStateAsync error: {ex.Message}");
+                return new AuthenticationState(_anonymous);
+            }
+        }
+
+        public async Task NotifyUserAuthenticationAsync(string accessToken)
+        {
+            // Store ONLY access token
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "accessToken", accessToken);
+
+            var handler = new JwtSecurityTokenHandler();
+            var jwt = handler.ReadJwtToken(accessToken);
+
+            var claims = new[]
+            {
+                new Claim(ClaimTypes.Name, jwt.Subject ?? ""),
+                new Claim(ClaimTypes.Role, jwt.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? "User"),
+                new Claim("userId", jwt.Claims.FirstOrDefault(c => c.Type == "userId")?.Value ?? "")
+            };
+
+            var identity = new ClaimsIdentity(claims, "jwt");
             var user = new ClaimsPrincipal(identity);
+
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
         }
 
-        public void NotifyUserLogout()
+        public async Task NotifyUserLogoutAsync()
         {
+            await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "accessToken");
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_anonymous)));
         }
     }

@@ -1,17 +1,24 @@
 @inject DatabaseService DbService
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject NavigationManager Navigation 
-@inject IJSRuntime JSRuntime
+@inject NavigationManager Navigation
+@inject IJSRuntime JsRuntime
 
 <h3>Login</h3>
 
 <div class="mb-3">
-    <input class="form-control" @bind="Email" placeholder="Email" />
+    <input class="form-control" @bind="Email" @bind:event="oninput" placeholder="Email" type="email" />
 </div>
 <div class="mb-3">
-    <input class="form-control" @bind="Password" type="password" placeholder="Password" />
+    <input class="form-control" @bind="Password" @bind:event="oninput" type="password" placeholder="Password" />
 </div>
-<button class="btn btn-primary" @onclick="LoginUser">Login</button>
+
+<button class="btn btn-primary" @onclick="LoginUser" disabled="@isLoading">
+    @if (isLoading)
+    {
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    }
+    Login
+</button>
 
 @if (!string.IsNullOrEmpty(Message))
 {
@@ -25,30 +32,45 @@
     private string Email = "";
     private string Password = "";
     private string Message = "";
+    private bool isLoading = false;
 
     private async Task LoginUser()
     {
         try
         {
+            isLoading = true;
             Message = "";
+            StateHasChanged();
+
+            if (string.IsNullOrWhiteSpace(Email))
+            {
+                Message = "Email is required.";
+                return;
+            }
+
+            if (string.IsNullOrWhiteSpace(Password))
+            {
+                Message = "Password is required.";
+                return;
+            }
 
             var userExists = await DbService.UserExists(Email);
-            
             if (!userExists)
             {
-                await JSRuntime.InvokeVoidAsync("console.log", $"User does not exist: {Email}");
                 Message = "User not found. Please check your email address.";
                 return;
             }
-            var isValid = await DbService.ValidateUser(Email, Password);
-            
-            if (isValid)
+
+            var accessToken = await DbService.ValidateUserAndGetToken(Email, Password);
+
+            if (accessToken != null)
             {
-                await JSRuntime.InvokeVoidAsync("console.log", $"Login successful for: {Email}");
-                
                 var authProvider = (CustomAuthStateProvider)AuthenticationStateProvider;
-                authProvider.NotifyUserAuthentication(Email);
-                
+                await authProvider.NotifyUserAuthenticationAsync(accessToken);
+
+                Email = "";
+                Password = "";
+
                 await OnLoginSuccess.InvokeAsync();
             }
             else
@@ -56,10 +78,15 @@
                 Message = "Invalid password. Please try again.";
             }
         }
-        
         catch (Exception ex)
         {
             Message = "An error occurred during login. Please try again.";
+            await JsRuntime.InvokeVoidAsync("console.error", "Login error:", ex.Message);
+        }
+        finally
+        {
+            isLoading = false;
+            StateHasChanged();
         }
     }
 }
