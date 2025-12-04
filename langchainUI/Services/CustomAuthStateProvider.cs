@@ -1,15 +1,14 @@
-using System.Security.Claims;
-using System.Threading.Tasks;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.JSInterop;
 using System.IdentityModel.Tokens.Jwt;
+using System.Security.Claims;
 
 namespace langchainUI.Services
 {
     public class CustomAuthStateProvider : AuthenticationStateProvider
     {
         private readonly IJSRuntime _jsRuntime;
-        private ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
+        private readonly ClaimsPrincipal _anonymous = new ClaimsPrincipal(new ClaimsIdentity());
 
         public CustomAuthStateProvider(IJSRuntime jsRuntime)
         {
@@ -20,66 +19,63 @@ namespace langchainUI.Services
         {
             try
             {
-                var accessToken = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "accessToken");
-                
-                if (string.IsNullOrWhiteSpace(accessToken))
-                    return new AuthenticationState(_anonymous);
-
-                var handler = new JwtSecurityTokenHandler();
-                var jwtToken = handler.ReadJwtToken(accessToken);
-
-                // Check if token is expired
-                if (jwtToken.ValidTo < DateTime.UtcNow)
+                var token = await _jsRuntime.InvokeAsync<string>("localStorage.getItem", "accessToken");
+                if (string.IsNullOrWhiteSpace(token))
                 {
-                    // Token expired, log out user
-                    await NotifyUserLogoutAsync();
                     return new AuthenticationState(_anonymous);
                 }
 
-                var claims = new[]
+                var handler = new JwtSecurityTokenHandler();
+                var jwtToken = handler.ReadToken(token) as JwtSecurityToken;
+
+                if (jwtToken == null || jwtToken.ValidTo < DateTime.UtcNow)
                 {
-                    new Claim(ClaimTypes.Name, jwtToken.Subject ?? ""),
-                    new Claim(ClaimTypes.Role, jwtToken.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? "User"),
-                    new Claim("userId", jwtToken.Claims.FirstOrDefault(c => c.Type == "userId")?.Value ?? "")
-                };
+                    await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "accessToken");
+                    return new AuthenticationState(_anonymous);
+                }
 
-                var identity = new ClaimsIdentity(claims, "jwt");
-                var user = new ClaimsPrincipal(identity);
-
-                return new AuthenticationState(user);
+                return CreateAuthenticationStateFromToken(token);
             }
-            catch (Exception ex)
+            catch
             {
-                Console.WriteLine($"GetAuthenticationStateAsync error: {ex.Message}");
                 return new AuthenticationState(_anonymous);
             }
         }
 
-        public async Task NotifyUserAuthenticationAsync(string accessToken)
+        public async Task NotifyUserAuthenticationAsync(string token)
         {
-            // Store ONLY access token
-            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "accessToken", accessToken);
+            await _jsRuntime.InvokeVoidAsync("localStorage.setItem", "accessToken", token);
+            var authState = CreateAuthenticationStateFromToken(token);
+            NotifyAuthenticationStateChanged(Task.FromResult(authState));
+        }
 
-            var handler = new JwtSecurityTokenHandler();
-            var jwt = handler.ReadJwtToken(accessToken);
-
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.Name, jwt.Subject ?? ""),
-                new Claim(ClaimTypes.Role, jwt.Claims.FirstOrDefault(c => c.Type == "role")?.Value ?? "User"),
-                new Claim("userId", jwt.Claims.FirstOrDefault(c => c.Type == "userId")?.Value ?? "")
-            };
-
-            var identity = new ClaimsIdentity(claims, "jwt");
-            var user = new ClaimsPrincipal(identity);
-
-            NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(user)));
+        public async Task NotifyAuthenticationStateChangedAsync()
+        {
+            var authState = await GetAuthenticationStateAsync();
+            NotifyAuthenticationStateChanged(Task.FromResult(authState));
         }
 
         public async Task NotifyUserLogoutAsync()
         {
             await _jsRuntime.InvokeVoidAsync("localStorage.removeItem", "accessToken");
             NotifyAuthenticationStateChanged(Task.FromResult(new AuthenticationState(_anonymous)));
+        }
+
+        private AuthenticationState CreateAuthenticationStateFromToken(string token)
+        {
+            var claims = ParseClaimsFromJwt(token);
+            if (!claims.Any()) return new AuthenticationState(_anonymous);
+
+            var identity = new ClaimsIdentity(claims, "jwtAuthType", JwtRegisteredClaimNames.Email, ClaimTypes.Role);
+            return new AuthenticationState(new ClaimsPrincipal(identity));
+        }
+
+        private IEnumerable<Claim> ParseClaimsFromJwt(string jwt)
+        {
+            if (string.IsNullOrWhiteSpace(jwt)) return Enumerable.Empty<Claim>();
+            var handler = new JwtSecurityTokenHandler();
+            var jsonToken = handler.ReadToken(jwt) as JwtSecurityToken;
+            return jsonToken?.Claims ?? Enumerable.Empty<Claim>();
         }
     }
 }

@@ -1,0 +1,76 @@
+@inject AuthService AuthService
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@inject IJSRuntime JsRuntime
+
+<div class="mb-3">
+    <input class="form-control" @bind="_email" @bind:event="oninput" placeholder="Email" type="email" />
+</div>
+<div class="mb-3">
+    <input class="form-control" @bind="_password" @bind:event="oninput" type="password" placeholder="Password" />
+</div>
+
+<button class="btn btn-primary" @onclick="LoginUser" disabled="@_isLoading">
+    @if (_isLoading)
+    {
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+    }
+    Login
+</button>
+
+@if (!string.IsNullOrEmpty(_message))
+{
+    <p class="mt-3 text-danger">@_message</p>
+}
+
+@code {
+    [Parameter]
+    public EventCallback OnLoginSuccess { get; set; }
+
+    private string _email = "";
+    private string _password = "";
+    private string _message = "";
+    private bool _isLoading;
+
+    private async Task LoginUser()
+    {
+        try
+        {
+            _isLoading = true;
+            _message = "";
+            StateHasChanged();
+
+            if (string.IsNullOrWhiteSpace(_email) || string.IsNullOrWhiteSpace(_password))
+            {
+                _message = "Email and password are required.";
+                return;
+            }
+
+            var tokenResponse = await AuthService.LoginUser(_email, _password);
+
+            if (tokenResponse != null)
+            {
+                var authProvider = (CustomAuthStateProvider)AuthenticationStateProvider;
+                await authProvider.NotifyUserAuthenticationAsync(tokenResponse.AccessToken);
+
+                _email = "";
+                _password = "";
+
+                await OnLoginSuccess.InvokeAsync();
+            }
+            else
+            { 
+                _message = "Invalid email or password. Please try again.";
+            }
+        }
+        catch (Exception ex)
+        {
+            _message = "An error occurred during login. Please try again.";
+            await JsRuntime.InvokeVoidAsync("console.error", "Login error:", ex.Message);
+        }
+        finally
+        {
+            _isLoading = false;
+            StateHasChanged();
+        }
+    }
+}

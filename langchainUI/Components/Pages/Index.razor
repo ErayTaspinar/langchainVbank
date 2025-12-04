@@ -3,363 +3,472 @@
 @layout EmptyLayout
 @implements IDisposable
 
+@using System.Text.Json
+@using System.Text.Json.Serialization
+@using System.Net.Http.Headers
+
 @inject AuthenticationStateProvider AuthenticationStateProvider
-@inject NavigationManager Navigation
+@inject ILogger<CustomAuthStateProvider> Logger
+@inject HttpClient Http
+@inject IJSRuntime JSRuntime
 
-<div class="page-container">
-    @if (_isAuthenticated)
-    {
-        <aside class="sidebar">
-            <div class="sidebar-header">
-                <h3 class="logo-text">ChatBot</h3>
-            </div>
-            <div class="sidebar-actions">
-                <button class="btn-new-chat" @onclick="StartNewConversation">
-                    + New Chat
-                </button>
-            </div>
-            <div class="conversation-list">
-                @foreach (var conversation in _conversations)
-                {
-                    <div class="conversation-item @(conversation.Id == _activeConversation?.Id ? "active" : "")" @onclick="() => SelectConversation(conversation)">
-                        @conversation.Title
+@if (_showAdminPortal)
+{
+    <AdminPortal OnExit="HandleExitAdminPortal"/>
+}
+else
+{
+    <div class="page-container">
+        <AuthorizeView>
+            <Authorized>
+                <aside class="sidebar">
+                    <div class="sidebar-header"><h3 class="logo-text">ChatBot</h3></div>
+                    <div class="sidebar-actions">
+                        <button class="btn-new-chat" @onclick="StartNewConversation">+ New Chat</button>
                     </div>
-                }
-            </div>
-        </aside>
-    }
+                    <div class="conversation-list">
+                        @if (_conversations.Any())
+                        {
+                            @foreach (var conversation in _conversations)
+                            {
+                                <div class="conversation-item @(conversation.SessionId == _activeConversation?.SessionId ? "active" : "")" @onclick="() => SelectConversation(conversation.SessionId)">
+                                    @conversation.Title
+                                </div>
+                            }
+                        }
+                        else
+                        {
+                            <div class="conversation-item-placeholder">No past conversations.</div>
+                        }
+                    </div>
+                </aside>
+            </Authorized>
+        </AuthorizeView>
 
-    <div class="chat-container">
-        <header class="top-header">
-            <div class="header-content">
-                <div class="auth-section">
-                    @if (!_isAuthenticated)
+        <div class="chat-container">
+            <header class="top-header">
+                <div class="header-content">
+                    <div class="auth-section">
+                        <AuthorizeView>
+                            <Authorized>
+                                @if (context.User.IsInRole("Admin"))
+                                {
+                                    <button class="btn-ghost" @onclick="HandleAdminPanelClick">Admin Panel</button>
+                                }
+                                <button class="btn-ghost" @onclick="Logout">Log out</button>
+                            </Authorized>
+                            <NotAuthorized>
+                                <button class="btn-ghost" @onclick='() => OpenModal("login")'>Log in</button>
+                                <button class="btn-primary" @onclick='() => OpenModal("register")'>Sign up</button>
+                            </NotAuthorized>
+                        </AuthorizeView>
+                    </div>
+                </div>
+            </header>
+
+            <main class="chat-main-content">
+                @if (_activeConversation != null)
+                {
+                    @if (!_activeConversation.Messages.Any() && !IsLoading)
                     {
-                        <button class="btn-ghost" @onclick='() => OpenModal("login")'>
-                            Log in
-                        </button>
-                        <button class="btn-primary" @onclick='() => OpenModal("register")'>
-                            Sign up
-                        </button>
+                        <div class="welcome-content">
+                            <div class="welcome-header">
+                                <h1 class="welcome-title">ChatBot</h1>
+                                <p class="subtitle">How can I help you today?</p>
+                            </div>
+                        </div>
                     }
                     else
                     {
-                        <!-- ONLY CHANGE: added onclick to make logout functional -->
-                        <button class="btn-ghost" @onclick="Logout">Log out</button>
-                    }
-                </div>
-            </div>
-        </header>
-
-        <main class="chat-main-content">
-            @if (_activeConversation != null)
-            {
-                @if (!_isAuthenticated && _activeConversation.Messages.Count == 0)
-                {
-                    <div class="welcome-content">
-                        <div class="welcome-header">
-                            <h1 class="welcome-title">ChatBot</h1>
-                            <p class="subtitle">How can I help you today?</p>
+                        <div class="messages-display">
+                            @foreach (var message in _activeConversation.Messages)
+                            {
+                                <div class="message @(message.Type == "human" ? "user-message" : "bot-message")">
+                                    @if (!string.IsNullOrEmpty(message.LocalImagePreviewUrl))
+                                    {
+                                        <img src="@message.LocalImagePreviewUrl" class="chat-image" alt="User upload"/>
+                                    }
+                                    else
+                                    {
+                                        @foreach (var img in message.Images)
+                                        {
+                                            <img src="@img.Url" class="chat-image" alt="Chat image"/>
+                                        }
+                                    }
+                                    @if (!string.IsNullOrWhiteSpace(message.Text))
+                                    {
+                                        <p>@((MarkupString)message.Text.Replace("\n", "<br/>"))</p>
+                                    }
+                                </div>
+                            }
+                            @if (IsLoading)
+                            {
+                                <div class="message bot-message">
+                                    <div class="typing-indicator">
+                                        <span></span><span></span><span></span>
+                                    </div>
+                                </div>
+                            }
                         </div>
-                    </div>
+                    }
                 }
-                else
-                {
-                    <div class="messages-display">
-                        @foreach (var message in _activeConversation.Messages)
-                        {
-                            <div class="message @(message.IsUser ? "user-message" : "bot-message")">
-                                <p>@message.Text</p>
-                            </div>
-                        }
-                    </div>
-                }
-            }
-        </main>
-        
-        <footer class="chat-input-area">
-            <div class="input-container">
-                <input @bind="_newMessage" @bind:event="oninput" @onkeyup="HandleKeyUp" class="form-control" placeholder="Type your message..." />
-                <button class="btn-primary" @onclick="HandleSendAttempt">Send</button>
-            </div>
-        </footer>
-    </div>
-</div>
+            </main>
 
+            <footer class="chat-input-area">
+                <div class="input-container">
+                    <label for="file-input" class="file-input-label">
+                        <i class="fas fa-paperclip"></i>
+                    </label>
+                    <InputFile id="file-input" OnChange="OnImageFileSelected" hidden accept="image/*"/>
+                    
+                    <input @bind="_newMessage" @bind:event="oninput" @onkeyup="HandleKeyUp" class="form-control" placeholder="Type your message..." disabled="@IsLoading"/>
+                    
+                    <button class="btn-primary" @onclick="SendMessage" disabled="@IsLoading">Send</button>
+                </div>
+                @if (!string.IsNullOrEmpty(_imagePreviewUrl))
+                {
+                    <div class="image-preview-container">
+                        <img src="@_imagePreviewUrl" class="image-preview"/>
+                        <button class="btn-remove-image" @onclick="ClearImageSelection">&times;</button>
+                    </div>
+                }
+            </footer>
+        </div>
+    </div>
+}
 
 @if (_showModal)
 {
     <ModalDialog Title="@_modalTitle" OnClose="CloseModal">
         @if (_modalContent == "login")
         {
-            <Login OnLoginSuccess="HandleLoginSuccess" />
+            <Login OnLoginSuccess="HandleLoginSuccess"/>
         }
         else if (_modalContent == "register")
         {
-            <Register />
+            <Register OnRegistrationSuccess="HandleRegistrationSuccess"/>
         }
     </ModalDialog>
 }
 
 <style>
     * { margin: 0; padding: 0; box-sizing: border-box; }
-
-    .page-container {
-        display: flex;
-        height: 100vh;
-        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        overflow: hidden;
-    }
-
-    .sidebar {
-        width: 260px;
-        flex-shrink: 0;
-        background-color: #f3f4f6;
-        border-right: 1px solid #e5e5e5;
-        display: flex;
-        flex-direction: column;
-    }
-    
-    .sidebar-header {
-        padding: 0.75rem 1rem;
-        border-bottom: 1px solid #e5e5e5;
-    }
-    
-    .sidebar-actions {
-        padding: 1rem;
-        border-bottom: 1px solid #e5e5e5;
-    }
-
-    .btn-new-chat {
-        width: 100%;
-        padding: 0.75rem;
-        background-color: white;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        text-align: left;
-        font-size: 0.875rem;
-        cursor: pointer;
-        transition: background-color 0.2s;
-    }
-
-    .btn-new-chat:hover {
-        background-color: #e5e7eb;
-    }
-
-    .conversation-list {
-        flex-grow: 1;
-        overflow-y: auto;
-        padding: 0.5rem;
-    }
-
-    .conversation-item {
-        padding: 0.75rem 1rem;
-        border-radius: 6px;
-        cursor: pointer;
-        white-space: nowrap;
-        overflow: hidden;
-        text-overflow: ellipsis;
-        font-size: 0.875rem;
-    }
-
-    .conversation-item:hover {
-        background-color: #e5e7eb;
-    }
-
-    .conversation-item.active {
-        background-color: #0066cc;
-        color: white;
-    }
-
-    .chat-container { 
-        display: flex; 
-        flex-direction: column; 
-        flex-grow: 1;
-        background-color: #ffffff;
-    }
-    
-    .top-header { 
-        flex-shrink: 0;
-        background-color: white; 
-        border-bottom: 1px solid #e5e5e5; 
-    }
-
-    .header-content { 
-        display: flex; 
-        justify-content: flex-end; 
-        align-items: center; 
-        padding: 0.75rem 1rem; 
-        max-width: 1200px; 
-        margin: 0 auto; 
-    }
-
+    .page-container { display: flex; height: 100vh; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; overflow: hidden; }
+    .sidebar { width: 260px; flex-shrink: 0; background-color: #f3f4f6; border-right: 1px solid #e5e5e5; display: flex; flex-direction: column; }
+    .sidebar-header { padding: 0.75rem 1rem; border-bottom: 1px solid #e5e5e5; }
+    .sidebar-actions { padding: 1rem; border-bottom: 1px solid #e5e5e5; }
+    .btn-new-chat { width: 100%; padding: 0.75rem; background-color: white; border: 1px solid #d1d5db; border-radius: 6px; text-align: left; font-size: 0.875rem; cursor: pointer; transition: background-color 0.2s; }
+    .btn-new-chat:hover { background-color: #e5e7eb; }
+    .conversation-list { flex-grow: 1; overflow-y: auto; padding: 0.5rem; }
+    .conversation-item { padding: 0.75rem 1rem; border-radius: 6px; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 0.875rem; }
+    .conversation-item:hover { background-color: #e5e7eb; }
+    .conversation-item.active { background-color: #0066cc; color: white; }
+    .conversation-item-placeholder { padding: 0.75rem 1rem; color: #6b7280; font-style: italic; font-size: 0.875rem; }
+    .chat-container { display: flex; flex-direction: column; flex-grow: 1; background-color: #ffffff; }
+    .top-header { flex-shrink: 0; background-color: white; border-bottom: 1px solid #e5e5e5; }
+    .header-content { display: flex; justify-content: flex-end; align-items: center; padding: 0.75rem 1rem; max-width: 1200px; margin: 0 auto; }
     .logo-text { font-size: 1.25rem; font-weight: 600; color: #0066cc; }
     .auth-section { display: flex; gap: 0.5rem; align-items: center; }
-
     .btn-ghost { background: none; border: none; color: #374151; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; }
     .btn-ghost:hover { background-color: #f3f4f6; }
     .btn-primary { background-color: #0066cc; color: white; border: none; padding: 0.5rem 1rem; border-radius: 6px; font-size: 0.875rem; font-weight: 500; cursor: pointer; transition: background-color 0.2s; }
     .btn-primary:hover { background-color: #0052a3; }
-    
-    .chat-main-content { 
-        flex-grow: 1;
-        overflow-y: auto;
-        padding: 1rem; 
-        display: flex; 
-        flex-direction: column; 
-    } 
-
+    .btn-primary:disabled { background-color: #a0c7e8; cursor: not-allowed; }
+    .chat-main-content { flex-grow: 1; overflow-y: auto; padding: 1rem; display: flex; flex-direction: column; }
     .welcome-content { text-align: center; margin: auto; }
     .welcome-title { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; color: #0066cc; }
-    .messages-display { display: flex; flex-direction: column; gap: 0.75rem; max-width: 800px; width: 100%; margin: 0 auto; justify-content: flex-end; flex-grow: 1; }
-    
-    .message { padding: 0.75rem 1rem; border-radius: 12px; max-width: 80%; word-wrap: break-word; }
+    .messages-display { display: flex; flex-direction: column; gap: 0.75rem; max-width: 800px; width: 100%; margin: 0 auto; padding-top: 1rem; }
+    .message { padding: 0.75rem 1rem; border-radius: 12px; max-width: 80%; word-wrap: break-word; line-height: 1.5; }
     .user-message { background-color: #f0f0f0; align-self: flex-end; border-bottom-right-radius: 0; }
     .bot-message { background-color: #e1f0ff; align-self: flex-start; border-bottom-left-radius: 0; }
-    
-    .chat-input-area { 
-        flex-shrink: 0;
-        padding: 1rem; 
-        border-top: 1px solid #e5e5e5; 
-        background-color: #ffffff; 
-    }
-
+    .chat-input-area { flex-shrink: 0; padding: 1rem; border-top: 1px solid #e5e5e5; background-color: #f9fafb; }
     .input-container { display: flex; gap: 0.5rem; max-width: 800px; margin: 0 auto; align-items: center; }
-    .form-control { flex: 1; padding: 0.75rem; border-radius: 20px; border: 1px solid #e5e5e5; }
+    .form-control { flex: 1; padding: 0.75rem 1.25rem; border-radius: 20px; border: 1px solid #d1d5db; transition: box-shadow 0.2s; }
+    .form-control:focus { box-shadow: 0 0 0 3px rgba(0, 102, 204, 0.2); outline: none; border-color: #0066cc; }
+    .file-input-label { cursor: pointer; padding: 0.5rem; font-size: 1.25rem; color: #6b7280; }
+    .file-input-label:hover { color: #0066cc; }
+    .image-preview-container { max-width: 800px; margin: 0.75rem auto 0; position: relative; width: fit-content; }
+    .image-preview { max-height: 100px; border-radius: 8px; border: 1px solid #d1d5db; }
+    .btn-remove-image { position: absolute; top: -10px; right: -10px; background-color: #374151; color: white; border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; font-size: 1rem; line-height: 24px; text-align: center; }
+    .typing-indicator { display: flex; align-items: center; justify-content: center; gap: 5px; }
+    .typing-indicator span { width: 8px; height: 8px; background-color: #0066cc; border-radius: 50%; animation: bounce 1.4s infinite ease-in-out both; }
+    .typing-indicator span:nth-child(1) { animation-delay: -0.32s; }
+    .typing-indicator span:nth-child(2) { animation-delay: -0.16s; }
+    .chat-image { max-width: 100%; border-radius: 8px; margin-bottom: 8px; }
 </style>
 
 @code {
-    private bool _isAuthenticated;
+    [CascadingParameter]
+    private Task<AuthenticationState> AuthStateTask { get; set; } = default!;
+
+    private bool _showAdminPortal = false;
     private string _newMessage = string.Empty;
     private bool _showModal = false;
-    private string _modalTitle = "";
-    private string _modalContent = "";
+    private string _modalTitle = "", _modalContent = "";
     private bool _disposed = false;
+    private List<ConversationSummary> _conversations = new();
+    private ActiveConversation? _activeConversation;
+    private bool IsLoading = false;
+    private IBrowserFile? _selectedImageFile;
+    private string? _imagePreviewUrl;
+    private const long MaxFileSize = 1024 * 1024 * 5;
 
-    private List<Conversation> _conversations = new List<Conversation>();
-    private Conversation? _activeConversation;
+    public class ConversationSummary { [JsonPropertyName("session_id")] public string SessionId { get; set; } = ""; [JsonPropertyName("title")] public string Title { get; set; } = "New Chat"; }
+    public class ActiveConversation { public string SessionId { get; set; } = ""; public List<ChatMessage> Messages { get; set; } = new List<ChatMessage>(); }
+    public class ImageInfo { [JsonPropertyName("url")] public string Url { get; set; } = ""; }
+    public class ChatMessage { [JsonPropertyName("id")] public int Id { get; set; } [JsonPropertyName("text")] public string Text { get; set; } = ""; [JsonPropertyName("type")] public string Type { get; set; } = "bot"; [JsonPropertyName("created_at")] public DateTime CreatedAt { get; set; } [JsonPropertyName("images")] public List<ImageInfo> Images { get; set; } = new(); [JsonIgnore] public string? LocalImagePreviewUrl { get; set; } }
 
     protected override async Task OnInitializedAsync()
     {
         AuthenticationStateProvider.AuthenticationStateChanged += HandleAuthenticationStateChanged;
-        var authState = await AuthenticationStateProvider.GetAuthenticationStateAsync();
-        _isAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
-
-        if (_conversations.Count == 0)
-            StartNewConversation();
-    }
-
-    private void StartNewConversation()
-    {
-        var newConversation = new Conversation();
-        _conversations.Insert(0, newConversation);
-        _activeConversation = newConversation;
-    }
-
-    private void SelectConversation(Conversation conversation)
-    {
-        _activeConversation = conversation;
-    }
-
-    private async Task SendMessage()
-    {
-        if (_activeConversation == null) return;
-
-        var userMessage = new ChatMessage { Text = _newMessage, IsUser = true };
-
-        if (_activeConversation.Messages.Count == 0)
-        {
-            _activeConversation.Title = _newMessage.Length > 25 ? _newMessage.Substring(0, 25) + "..." : _newMessage;
-        }
-
-        _activeConversation.Messages.Add(userMessage);
-
-        var messageToSend = _newMessage;
-        _newMessage = string.Empty;
-        await InvokeAsync(StateHasChanged);
-
-        await Task.Delay(500);
-        var botMessage = new ChatMessage { Text = $"Simulated response to: '{messageToSend}'", IsUser = false };
-        _activeConversation.Messages.Add(botMessage);
-
-        await InvokeAsync(StateHasChanged);
+        await UpdateHttpClientHeader(); 
+        await LoadUserConversations();
     }
 
     private async void HandleAuthenticationStateChanged(Task<AuthenticationState> task)
     {
-        try
+        if (_disposed) return;
+
+        _conversations.Clear();
+        _activeConversation = null;
+        _newMessage = string.Empty;
+        _selectedImageFile = null;
+        
+        await UpdateHttpClientHeader();
+        await InvokeAsync(StateHasChanged);
+        await InvokeAsync(LoadUserConversations);
+    }
+
+    private async Task UpdateHttpClientHeader()
+    {
+        try 
         {
-            var authState = await task;
-            var newIsAuthenticated = authState.User.Identity?.IsAuthenticated ?? false;
-            await InvokeAsync(() =>
+            var token = await JSRuntime.InvokeAsync<string>("localStorage.getItem", "accessToken");
+            if (!string.IsNullOrEmpty(token))
             {
-                if (_disposed) return;
-
-                if (newIsAuthenticated != _isAuthenticated)
-                {
-                    _isAuthenticated = newIsAuthenticated;
-
-                    if (_isAuthenticated)
-                    {
-                        _conversations.Clear();
-                        StartNewConversation();
-                    }
-                    StateHasChanged();
-                }
-            });
+                Http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
+            }
+            else
+            {
+                Http.DefaultRequestHeaders.Authorization = null;
+            }
         }
         catch { }
     }
-
-    private async Task HandleSendAttempt()
+    
+    private async Task LoadUserConversations()
     {
-        if (string.IsNullOrWhiteSpace(_newMessage)) return;
-        if (_isAuthenticated) await SendMessage();
-        else OpenModal("login");
+        await UpdateHttpClientHeader();
+        var authState = await AuthStateTask;
+        var user = authState.User;
+
+        if (user.Identity?.IsAuthenticated ?? false)
+        {
+            var userEmail = user.Identity.Name; 
+            if (string.IsNullOrEmpty(userEmail)) return;
+
+            try
+            {
+                var sessions = await Http.GetFromJsonAsync<List<ConversationSummary>>($"/chats/user/{userEmail}");
+                _conversations = sessions ?? new List<ConversationSummary>();
+                if (_conversations.Any())
+                {
+                    await SelectConversation(_conversations.First().SessionId);
+                }
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, "Failed to load conversations for user {Email}.", userEmail);
+            }
+        }
+        StateHasChanged();
+    }
+    
+    private async Task StartNewConversation()
+    {
+        if (_activeConversation != null && !_activeConversation.Messages.Any()) return;
+
+        await UpdateHttpClientHeader();
+
+        var authState = await AuthStateTask;
+        var user = authState.User;
+        var userEmail = user.Identity?.Name;
+
+        if (string.IsNullOrEmpty(userEmail))
+        {
+            Logger.LogError("Cannot create chat: User email is missing.");
+            return;
+        }
+
+        try
+        {
+            var payload = new { user_id = userEmail, email = userEmail };
+            var jsonPayload = JsonSerializer.Serialize(payload);
+            var content = new StringContent(jsonPayload, System.Text.Encoding.UTF8, "application/json");
+
+            var response = await Http.PostAsync("/chat/new", content);
+            response.EnsureSuccessStatusCode();
+            
+            var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+            if (result != null && result.TryGetValue("session_id", out var newSessionId))
+            {
+                var newConversation = new ConversationSummary { SessionId = newSessionId, Title = "New Chat" };
+                _conversations.Insert(0, newConversation);
+                await SelectConversation(newSessionId);
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to create new chat.");
+        }
+    }
+    
+    private async Task SelectConversation(string sessionId)
+    {
+        if (string.IsNullOrEmpty(sessionId) || _activeConversation?.SessionId == sessionId) return;
+
+        IsLoading = true;
+        _activeConversation = new ActiveConversation { SessionId = sessionId };
+        StateHasChanged();
+
+        try
+        {
+            await UpdateHttpClientHeader();
+            var history = await Http.GetFromJsonAsync<List<ChatMessage>>($"/chat/{sessionId}");
+            if (_activeConversation.SessionId == sessionId)
+            {
+                _activeConversation.Messages = history ?? new List<ChatMessage>();
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to load chat history for session {SessionId}", sessionId);
+        }
+        finally
+        {
+            if (_activeConversation?.SessionId == sessionId)
+            {
+                IsLoading = false;
+                StateHasChanged();
+            }
+        }
     }
 
+    private async Task SendMessage()
+    {
+        if (_activeConversation == null || string.IsNullOrWhiteSpace(_newMessage) && _selectedImageFile == null) return;
+        
+        await UpdateHttpClientHeader();
+
+        var rawMessage = _newMessage;
+        var cleanMessageText = rawMessage.Replace("{image}", "").Trim();
+        var userMessage = new ChatMessage 
+        { 
+            Text = cleanMessageText, 
+            Type = "human",
+            LocalImagePreviewUrl = _imagePreviewUrl 
+        };
+        var imageFileToSend = _selectedImageFile;
+
+        _activeConversation.Messages.Add(userMessage);
+
+        _newMessage = string.Empty;
+        ClearImageSelection();
+        IsLoading = true;
+        await InvokeAsync(StateHasChanged);
+        
+        try
+        {
+            using var content = new MultipartFormDataContent();
+            content.Add(new StringContent(rawMessage), "message");
+
+            if (imageFileToSend != null)
+            {
+                var imageStream = imageFileToSend.OpenReadStream(MaxFileSize);
+                content.Add(new StreamContent(imageStream), "image", imageFileToSend.Name);
+            }
+            
+            var response = await Http.PostAsync($"/chat/{_activeConversation.SessionId}", content);
+            response.EnsureSuccessStatusCode();
+            
+            var result = await response.Content.ReadFromJsonAsync<Dictionary<string, string>>();
+            if (result != null && result.TryGetValue("response", out var botResponse))
+            {
+                _activeConversation.Messages.Add(new ChatMessage { Text = botResponse, Type = "ai" });
+            }
+        }
+        catch (Exception ex)
+        {
+            Logger.LogError(ex, "Failed to send message.");
+            _activeConversation.Messages.Add(new ChatMessage { Text = "Sorry, something went wrong.", Type = "ai" });
+        }
+        finally
+        {
+            IsLoading = false;
+            await InvokeAsync(StateHasChanged);
+        }
+    }
+
+    private async Task OnImageFileSelected(InputFileChangeEventArgs e)
+    {
+        _selectedImageFile = e.File;
+        if (_selectedImageFile == null) return;
+        var buffer = new byte[_selectedImageFile.Size];
+        await _selectedImageFile.OpenReadStream(MaxFileSize).ReadAsync(buffer);
+        _imagePreviewUrl = $"data:{_selectedImageFile.ContentType};base64,{Convert.ToBase64String(buffer)}";
+        _newMessage += " {image}";
+        StateHasChanged();
+    }
+
+    private void ClearImageSelection()
+    {
+        _selectedImageFile = null;
+        _imagePreviewUrl = null;
+        if(_newMessage.Contains("{image}"))
+        {
+            _newMessage = _newMessage.Replace("{image}", "").Trim();
+        }
+        StateHasChanged();
+    }
+    
     private async Task HandleKeyUp(KeyboardEventArgs e)
     {
-        if (e.Key == "Enter") await HandleSendAttempt();
+        if (e.Key == "Enter") await SendMessage();
     }
 
-    private async Task HandleLoginSuccess()
+    private void HandleLoginSuccess() => CloseModal();
+    private void HandleRegistrationSuccess() => CloseModal();
+    private void HandleAdminPanelClick() => _showAdminPortal = true;
+    
+    private async Task HandleExitAdminPortal()
     {
-        CloseModal();
-        if (!string.IsNullOrWhiteSpace(_newMessage)) await SendMessage();
+        _showAdminPortal = false;
+        await InvokeAsync(StateHasChanged);
     }
-
+    
     private void OpenModal(string content)
     {
         _modalContent = content;
-        _modalTitle = content == "login" ? "Please log in to continue" : "Create an account to chat";
+        _modalTitle = content == "login" ? "Log In" : "Sign Up";
         _showModal = true;
+        StateHasChanged();
     }
-
-    private void CloseModal() => _showModal = false;
-
+    
+    private void CloseModal()
+    {
+        _showModal = false;
+        StateHasChanged();
+    }
+    
     private async Task Logout()
     {
         var authProvider = (CustomAuthStateProvider)AuthenticationStateProvider;
         await authProvider.NotifyUserLogoutAsync();
     }
-
+    
     public void Dispose()
-    {
+    {   
         _disposed = true;
         AuthenticationStateProvider.AuthenticationStateChanged -= HandleAuthenticationStateChanged;
-    }
-
-    public class ChatMessage
-    {
-        public string Text { get; set; } = "";
-        public bool IsUser { get; set; }
-    }
-
-    public class Conversation
-    {
-        public Guid Id { get; set; } = Guid.NewGuid();
-        public string Title { get; set; } = "New Chat";
-        public List<ChatMessage> Messages { get; set; } = new List<ChatMessage>();
     }
 }

@@ -4,6 +4,7 @@
         <TargetFramework>net9.0</TargetFramework>
         <Nullable>enable</Nullable>
         <ImplicitUsings>enable</ImplicitUsings>
+        <DockerDefaultTargetOS>Linux</DockerDefaultTargetOS>
     </PropertyGroup>
 
     <ItemGroup>
@@ -13,9 +14,11 @@
       <PackageReference Include="DotNetEnv" Version="3.1.1" />
       <PackageReference Include="Isopoh.Cryptography.Argon2" Version="2.0.0" />
       <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+      <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="9.0.10" />
       <PackageReference Include="Microsoft.AspNetCore.Mvc.NewtonsoftJson" Version="9.0.9" />
       <PackageReference Include="Microsoft.IdentityModel.Tokens" Version="8.14.0" />
       <PackageReference Include="Npgsql" Version="9.0.4" />
+      <PackageReference Include="prometheus-net.AspNetCore" Version="8.2.1" />
       <PackageReference Include="System.IdentityModel.Tokens.Jwt" Version="8.14.0" />
       <PackageReference Include="System.Net.Http.Json" Version="9.0.9" />
       <PackageReference Include="WebAssembly" Version="1.3.0" />
@@ -30,6 +33,11 @@
         <ExcludeFromSingleFile>true</ExcludeFromSingleFile>
         <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
       </Content>
+    </ItemGroup>
+
+    <ItemGroup>
+      <_ContentIncludedByDefault Remove="Components\Pages\Admin\Index.razor" />
+      <_ContentIncludedByDefault Remove="Components\Pages\Admin\LoginModal.razor" />
     </ItemGroup>
 
 </Project>

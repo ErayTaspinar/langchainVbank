@@ -12,49 +12,37 @@ public class JwtService
     private readonly string _audience;
 
     public JwtService()
-    { 
+    {
         DotEnv.Load();
         _jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET")
                      ?? throw new InvalidOperationException("JWT_SECRET not set in environment variables!");
-
-        _issuer = "http://localhost:5162";
-        _audience = "http://localhost:5162";
+        _issuer = "VBankLangChain";
+        _audience = "User";
     }
 
-    /// <summary>
-    /// Generates a JWT for a given user ID and role.
-    /// </summary>
-    /// <param name="userId">The user's unique identifier.</param>
-    /// <param name="role">The user's role (e.g., "Admin", "User").</param>
-    /// <returns>A signed JWT string.</returns>
-    public string GenerateToken(int userId, string role)
+    public string GenerateAccessToken(string userId, string email, string role)
     {
+        var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
+        var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
+
         var claims = new[]
         {
-            new Claim(JwtRegisteredClaimNames.Sub, userId.ToString()),
+            new Claim(JwtRegisteredClaimNames.Sub, userId),
+            new Claim(JwtRegisteredClaimNames.Email, email),
             new Claim(ClaimTypes.Role, role),
             new Claim(JwtRegisteredClaimNames.Jti, Guid.NewGuid().ToString())
         };
-
-        var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
-        var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
         var token = new JwtSecurityToken(
             issuer: _issuer,
             audience: _audience,
             claims: claims,
-            expires: DateTime.UtcNow.AddSeconds(60),
-            signingCredentials: creds
-        );
+            expires: DateTime.UtcNow.AddMinutes(15),
+            signingCredentials: credentials);
 
         return new JwtSecurityTokenHandler().WriteToken(token);
     }
 
-    /// <summary>
-    /// Validates an incoming JWT string.
-    /// </summary>
-    /// <param name="token">The JWT string to validate.</param>
-    /// <returns>The ClaimsPrincipal from the token if valid; otherwise, null.</returns>
     public ClaimsPrincipal? ValidateToken(string token)
     {
         if (string.IsNullOrEmpty(token))
@@ -71,23 +59,15 @@ public class JwtService
             {
                 ValidateIssuer = true,
                 ValidIssuer = _issuer,
-
                 ValidateAudience = true,
                 ValidAudience = _audience,
-
                 ValidateIssuerSigningKey = true,
                 IssuerSigningKey = new SymmetricSecurityKey(key),
-
                 ValidateLifetime = true,
-
                 ClockSkew = TimeSpan.Zero
             }, out SecurityToken validatedToken);
 
             return principal;
-        }
-        catch (SecurityTokenException)
-        {
-            return null;
         }
         catch (Exception)
         {

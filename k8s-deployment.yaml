@@ -1,0 +1,195 @@
+# 1. DATABASE (Postgres) - WITH PERSISTENCE
+
+# 1. Create the "Hard Drive" (Volume Claim)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+---
+# 2. Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: chatbottesting   # Lowercase (DNS requirement)
+spec:
+  ports:
+    - port: 5432
+  selector:
+    app: postgres
+---
+# 3. Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:15
+          
+          # MOUNT THE VOLUME (The "Hard Drive")
+          volumeMounts:
+            - mountPath: /var/lib/postgresql/data
+              name: postgres-storage
+              
+          env:
+            - name: POSTGRES_USER
+              value: "eraytaspinar"
+            - name: POSTGRES_DB
+              value: "postgres"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: DB_PASSWORD
+          ports:
+            - containerPort: 5432
+            
+      # DEFINE THE VOLUME
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+
+---
+
+# 2. PYTHON BACKEND (LangChain)
+apiVersion: v1
+kind: Service
+metadata:
+  name: langchain-service
+spec:
+  ports:
+    - port: 5001
+      targetPort: 5001
+  selector:
+    app: langchain
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: langchain
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: langchain
+  template:
+    metadata:
+      labels:
+        app: langchain
+    spec:
+      initContainers:
+        - name: wait-for-db
+          image: busybox
+          command: ['sh', '-c', 'until nc -z chatbottesting 5432; do echo waiting for db; sleep 2; done;']
+      containers:
+        - name: langchain
+          image: langchain:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 5001
+          
+          # Load Secrets (DB Password + API Keys)
+          envFrom:
+            - secretRef:
+                name: backend-secrets
+          
+          env:
+            - name: DB_HOST
+              value: "chatbottesting"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "eraytaspinar"
+            - name: DB_NAME
+              value: "postgres"
+              
+            # AI Cache Paths
+            - name: SENTENCE_TRANSFORMERS_HOME
+              value: "/app/model_cache"
+            - name: TORCH_HOME
+              value: "/app/model_cache"
+            - name: HF_HOME
+              value: "/app/model_cache"
+          readinessProbe:
+            tcpSocket:
+              port: 5001
+            initialDelaySeconds: 15
+            periodSeconds: 10
+            failureThreshold: 30
+
+---
+
+# 3. FRONTEND (Blazor)
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+spec:
+  type: LoadBalancer
+  ports:
+    - port: 5162
+      targetPort: 8080
+  selector:
+    app: frontend
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: frontend
+  template:
+    metadata:
+      labels:
+        app: frontend
+    spec:
+      initContainers:
+        - name: wait-for-python
+          image: busybox
+          command: ['sh', '-c', 'until nc -z langchain-service 5001; do echo waiting for python; sleep 2; done;']
+      containers:
+        - name: frontend
+          image: langchain-ui:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 8080
+          
+          # Load Secrets (DB Password + Security Key)
+          envFrom:
+            - secretRef:
+                name: backend-secrets
+            - secretRef:
+                name: frontend-secrets
+          
+          # Explicit DB Config to prevent startup crash
+          env:
+            - name: API_BASE_URL
+              value: "http://langchain-service:5001"
+            - name: DB_HOST
+              value: "chatbottesting"
+            - name: DB_PORT
+              value: "5432"
+            - name: DB_USER
+              value: "eraytaspinar"
+            - name: DB_NAME
+              value: "postgres"

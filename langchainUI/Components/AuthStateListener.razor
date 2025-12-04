@@ -1,0 +1,28 @@
+@inject IJSRuntime JsRuntime
+@inject AuthenticationStateProvider AuthenticationStateProvider
+@implements IDisposable
+
+@code {
+    private DotNetObjectReference<AuthStateListener>? _dotNetObjectReference;
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            _dotNetObjectReference = DotNetObjectReference.Create(this);
+            await JsRuntime.InvokeVoidAsync("registerAuthenticationListener", _dotNetObjectReference);
+        }
+    }
+
+    [JSInvokable]
+    public async Task OnTokenChanged()
+    {
+        var customAuthProvider = (CustomAuthStateProvider)AuthenticationStateProvider;
+        await customAuthProvider.NotifyAuthenticationStateChangedAsync();
+    }
+
+    public void Dispose()
+    {
+        _dotNetObjectReference?.Dispose();
+    }
+}

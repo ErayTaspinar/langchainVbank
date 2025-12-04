@@ -1,0 +1,30 @@
+# JetBrains Rider / IDE files
+.idea/
+*.sln.iml
+*.suo
+*.user
+*.userosscache
+*.slnf
+
+# Visual Studio files (just in case)
+.vs/
+.vscode/
+
+# Build results (CRITICAL to ignore)
+**/bin/
+**/obj/
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+
+# Environment Variables
+.env
+
+# Mac System files
+.DS_Store

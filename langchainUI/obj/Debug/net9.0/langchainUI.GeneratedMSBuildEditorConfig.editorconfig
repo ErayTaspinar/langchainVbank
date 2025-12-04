@@ -20,8 +20,16 @@ build_property._RazorSourceGeneratorDebug =
 build_property.EffectiveAnalysisLevelStyle = 9.0
 build_property.EnableCodeStyleSeverity = 
 
+[/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/AdminPortal.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9BZG1pblBvcnRhbC5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/App.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9BcHAucmF6b3I=
+build_metadata.AdditionalFiles.CssScope = 
+
+[/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/AuthStateListener.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9BdXRoU3RhdGVMaXN0ZW5lci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Layout/EmptyLayout.razor]
@@ -32,6 +40,10 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9MYXlvdXQvTW9kYWxEaWFsb2cucmF6b3I=
 build_metadata.AdditionalFiles.CssScope = 
 
+[/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Login.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9Mb2dpbi5yYXpvcg==
+build_metadata.AdditionalFiles.CssScope = 
+
 [/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Pages/Error.razor]
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9FcnJvci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
@@ -40,12 +52,8 @@ build_metadata.AdditionalFiles.CssScope =
 build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9JbmRleC5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
-[/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Pages/Login.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9Mb2dpbi5yYXpvcg==
-build_metadata.AdditionalFiles.CssScope = 
-
-[/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Pages/Register.razor]
-build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9QYWdlcy9SZWdpc3Rlci5yYXpvcg==
+[/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Register.razor]
+build_metadata.AdditionalFiles.TargetPath = Q29tcG9uZW50cy9SZWdpc3Rlci5yYXpvcg==
 build_metadata.AdditionalFiles.CssScope = 
 
 [/Users/eraytaspinar/PycharmProjects/langchainVbank/langchainUI/Components/Routes.razor]

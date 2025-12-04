@@ -1,0 +1,91 @@
+# =================================================================
+# 1. CONFIGURATION (Auto-Connect to Postgres)
+# =================================================================
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-datasources
+  labels:
+    name: grafana-datasources
+data:
+  datasources.yaml: |
+    apiVersion: 1
+    datasources:
+      - name: Postgres
+        type: postgres
+        # Connects to your Postgres Service defined in chat-app.yaml
+        url: chatbottesting:5432
+        user: eraytaspinar
+        database: postgres
+        editable: true
+        jsonData:
+          sslmode: "disable"
+        secureJsonData:
+          # This pulls the actual password from the environment variable below
+          password: "$POSTGRES_PASSWORD"
+
+---
+# =================================================================
+# 2. GRAFANA DEPLOYMENT
+# =================================================================
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: grafana
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: grafana
+  template:
+    metadata:
+      labels:
+        app: grafana
+    spec:
+      containers:
+        - name: grafana
+          image: grafana/grafana:latest
+          ports:
+            - containerPort: 3000
+          
+          env:
+            # 1. GET DB PASSWORD (from your existing backend-secrets)
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: backend-secrets
+                  key: DB_PASSWORD
+            
+            # 2. CREATE ADMIN ACCOUNT (No email needed)
+            - name: GF_SECURITY_ADMIN_USER
+              value: "admin"
+            - name: GF_SECURITY_ADMIN_PASSWORD
+              value: "admin"
+              
+          # Mount the configuration from Step 1
+          volumeMounts:
+            - name: grafana-datasources
+              mountPath: /etc/grafana/provisioning/datasources
+              readOnly: true
+      
+      volumes:
+        - name: grafana-datasources
+          configMap:
+            defaultMode: 420
+            name: grafana-datasources
+
+---
+# =================================================================
+# 3. GRAFANA SERVICE (Exposed to Localhost)
+# =================================================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: grafana-service
+spec:
+  type: LoadBalancer   # <--- Makes it accessible at localhost:3000
+  ports:
+    - port: 3000
+      targetPort: 3000
+  selector:
+    app: grafana

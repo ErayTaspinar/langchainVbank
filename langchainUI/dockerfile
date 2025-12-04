@@ -1,0 +1,24 @@
+# STAGE 1: Build (Using .NET 9 SDK)
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS build
+WORKDIR /src
+
+# Copy project file
+COPY ["langchainUI.csproj", "./"]
+RUN dotnet restore
+
+# Copy source code
+COPY . .
+
+# Build
+RUN dotnet publish -c Release -o /app/publish
+
+# STAGE 2: Run (Using .NET 9 Runtime)
+FROM mcr.microsoft.com/dotnet/aspnet:9.0
+WORKDIR /app
+
+# Copy compiled files
+COPY --from=build /app/publish .
+
+EXPOSE 8080
+
+ENTRYPOINT ["dotnet", "langchainUI.dll"]
