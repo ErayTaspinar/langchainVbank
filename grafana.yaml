@@ -15,7 +15,7 @@ data:
       - name: Prometheus
         type: prometheus
         uid: PBFA97CFB590B2093
-        url: http://monitor-stack-kube-prometh-prometheus.monitoring:9090
+        url: http://prometheus:9090
         access: proxy
         isDefault: true
       - name: Postgres
@@ -26,7 +26,7 @@ data:
         jsonData:
           sslmode: "disable"
         secureJsonData:
-          password: "$POSTGRES_PASSWORD"
+          password: "${POSTGRES_PASSWORD}"
 
   # ---------------------------------------------------------
   # B. DASHBOARD PROVIDER

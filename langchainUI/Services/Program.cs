@@ -3,6 +3,7 @@ using langchainUI.Services;
 using Microsoft.AspNetCore.Components.Authorization;
 using DotNetEnv;
 using System.IdentityModel.Tokens.Jwt;
+using System.Text;
 
 // Load .env file for local development (Rider)
 Env.Load();
@@ -29,6 +30,12 @@ var pepper = Environment.GetEnvironmentVariable("PEPPER");
 if (string.IsNullOrEmpty(jwtSecret) || string.IsNullOrEmpty(pepper))
 {
     throw new InvalidOperationException("FATAL: Missing security environment variables.");
+}
+
+if (Encoding.UTF8.GetByteCount(jwtSecret) < 16)
+{
+    throw new InvalidOperationException(
+        "FATAL: JWT_SECRET is too short for HS256. Provide at least 16 bytes (128 bits), preferably 32+ bytes.");
 }
 
 builder.Configuration["Jwt:Secret"] = jwtSecret;

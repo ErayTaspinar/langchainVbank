@@ -108,7 +108,11 @@ namespace langchainUI.Services
             {
                 var checkQuery = "SELECT COUNT(*) FROM users WHERE email = @Email";
                 var exists = await connection.ExecuteScalarAsync<int>(checkQuery, new { Email = email }, transaction);
-                if (exists > 0) return false;
+                if (exists > 0)
+                {
+                    await transaction.RollbackAsync();
+                    return false;
+                }
                 var salt = GenerateSalt();
                 var hashedPassword = HashPassword(password, salt);
                 var insertUserQuery = "INSERT INTO users (email, password_hash, created_at) VALUES (@Email, @PasswordHash, @CreatedAt) RETURNING id";

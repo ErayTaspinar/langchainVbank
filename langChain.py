@@ -373,6 +373,18 @@ def get_user_chats(email):
         return jsonify({"error": "Failed to retrieve chats."}), 500
 
 
+@app.route('/healthz', methods=['GET'])
+def healthz():
+    try:
+        with memory.get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1")
+                cur.fetchone()
+        return jsonify({"status": "ok"}), 200
+    except Exception as e:
+        return jsonify({"status": "error"}), 503
+
+
 @app.route('/chat/<string:session_id>', methods=['GET'])
 def get_chat_history(session_id):
     return jsonify(memory.get_conversation_history(session_id)), 200
