@@ -11,6 +11,33 @@ The instructions below deploy everything on a local machine using Docker Desktop
 
 ---
 
+Architecture (Diagrams)
+
+Backend chat + agent/tooling flow:
+
+![Backend chat flow](pythonFlow.png)
+
+At a high level:
+
+- A user request hits the Flask API (`/chat/new` and `/chat/:id`).
+- The API invokes a LangGraph agent, which drives the LLM and decides whether tools are needed.
+- Conversation memory/context is persisted to PostgreSQL (via a memory buffer), and retrieved on subsequent calls.
+- The agent can optionally call “tool belt” sources (vector DB / internal knowledge, image analysis, general web search, code Q&A sources) depending on the question.
+- The Flask API returns a JSON response to the UI.
+
+Blazor UI auth + security services flow:
+
+![Blazor auth flow](blazorFlow.png)
+
+At a high level:
+
+- `Register.razor` and `Login.razor` call into the auth layer.
+- Tokens are generated/validated via the security services and stored client-side by the auth state provider.
+- A background cleanup service periodically removes expired tokens.
+- The UI updates (e.g., navigates to the home page) once authentication state changes.
+
+---
+
 Quick Start (Docker Desktop Kubernetes)
 
 1) Prerequisites
