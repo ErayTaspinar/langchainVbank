@@ -323,13 +323,13 @@
             "uid": "${DS_PROMETHEUS}"
           },
           "editorMode": "code",
-          "expr": "sum(rate(process_network_receive_bytes_total{}[5m]))",
-          "legendFormat": "{{label_name}} Received Bytes Total",
+          "expr": "sum(rate(process_cpu_seconds_total{}[5m]))",
+          "legendFormat": "{{label_name}} CPU process",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Traffic Load (Network Receive)",
+      "title": "Traffic CPU Load",
       "type": "timeseries"
     },
     {

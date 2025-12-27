@@ -4,6 +4,8 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 
 kubectl apply -f "$repo_root/k8s-deployment.yaml"
+kubectl apply -f "$repo_root/grafana.yaml"
+kubectl apply -f "$repo_root/prometheus-k8s.yaml"
 
 # Secrets are injected as env vars; pods must restart to pick up changes.
 kubectl rollout restart deployment/langchain deployment/frontend >/dev/null 2>&1 || true
