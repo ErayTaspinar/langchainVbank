@@ -1,4 +1,4 @@
-LangChain VBank (Local Kubernetes)
+# LangChain VBank (Local Kubernetes)
 
 This repo is a full-stack AI chat application:
 
@@ -65,15 +65,25 @@ From the repo root:
 This project uses Kubernetes Secrets (not `.env`) when running in k8s.
 
 - Template: [k8s-secrets.example.yaml](k8s-secrets.example.yaml)
-- Your local file (do not commit): [k8s-secrets.yaml](k8s-secrets.yaml)
+- Do not commit secrets. This repo does not ship a real `k8s-secrets.yaml`.
 
-Create/update secrets:
+Create/update secrets (option A: YAML file):
 
 - Copy template:
 	- `cp k8s-secrets.example.yaml k8s-secrets.yaml`
-- Fill values in [k8s-secrets.yaml](k8s-secrets.yaml)
+- Fill values in `k8s-secrets.yaml`
 - Apply:
 	- `kubectl apply -f k8s-secrets.yaml`
+
+Create/update secrets (option B: from environment variables; recommended for local CI/CD):
+
+- Export required env vars:
+	- `export DB_PASSWORD='...'`
+	- `export OPENROUTER_API_KEY='...'`
+	- `export JWT_SECRET='...'`
+	- `export PEPPER='...'`
+- Apply secrets:
+	- `bash scripts/k8s/apply_secrets_from_env.sh`
 
 Important:
 
@@ -174,3 +184,37 @@ Troubleshooting
 	- `kubectl logs deployment/langchain --tail=200`
 	- `kubectl logs deployment/postgres --tail=200`
 - If you see antiforgery token errors after changing DataProtection/JWT settings, clear browser site data for `http://localhost:5162`.
+
+---
+
+Local CI/CD (Docker Desktop Kubernetes only)
+
+This repo includes a local-only CI/CD definition intended to run on *your own machine* using a GitHub Actions self-hosted runner and Docker Desktop Kubernetes.
+
+- Workflow: [.github/workflows/local-docker-desktop-k8s.yml](.github/workflows/local-docker-desktop-k8s.yml)
+- It will:
+	- build `langchain:latest` and `langchain-ui:latest`
+	- create/update k8s Secrets from your local environment variables
+	- apply [k8s-deployment.yaml](k8s-deployment.yaml)
+	- wait for rollouts
+	- smoke test backend `/healthz` and frontend HTTP
+
+Required tools on the runner machine:
+
+- Docker Desktop (Kubernetes enabled)
+- `kubectl`
+
+Required environment variables on the runner machine:
+
+- `DB_PASSWORD`
+- `OPENROUTER_API_KEY`
+- `JWT_SECRET` (>= 16 bytes)
+- `PEPPER`
+
+Manual local CI/CD (without GitHub Actions):
+
+- `make ci`
+
+Safety:
+
+- The scripts refuse to run unless your current kube context is `docker-desktop` (override with `KUBE_CONTEXT`, at your own risk).
