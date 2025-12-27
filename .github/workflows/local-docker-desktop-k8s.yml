@@ -1,0 +1,57 @@
+name: Local CI/CD (Docker Desktop K8s)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ["v2"]
+
+jobs:
+  local-k8s:
+    # This workflow is intended to run ONLY on your local machine as a self-hosted runner.
+    # It uses the local Docker daemon + Docker Desktop Kubernetes (context: docker-desktop).
+    runs-on: [self-hosted]
+
+    env:
+      # Safety check: refuse to run against a non-local cluster by default.
+      KUBE_CONTEXT: docker-desktop
+
+      # Image names used by k8s-deployment.yaml
+      BACKEND_IMAGE: langchain:latest
+      FRONTEND_IMAGE: langchain-ui:latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Validate toolchain
+        shell: bash
+        run: |
+          set -euo pipefail
+          command -v docker
+          command -v kubectl
+          docker version
+          kubectl version --client=true
+
+      - name: Ensure Docker Desktop K8s context
+        shell: bash
+        run: bash scripts/k8s/check_context.sh
+
+      - name: Build Docker images (local)
+        shell: bash
+        run: bash scripts/k8s/build_images.sh
+
+      - name: Apply Kubernetes secrets from local env
+        shell: bash
+        run: bash scripts/k8s/apply_secrets_from_env.sh
+
+      - name: Deploy stack
+        shell: bash
+        run: bash scripts/k8s/deploy_stack.sh
+
+      - name: Wait for rollout
+        shell: bash
+        run: bash scripts/k8s/wait_rollout.sh
+
+      - name: Smoke test
+        shell: bash
+        run: bash scripts/k8s/smoke_test.sh
