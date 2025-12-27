@@ -10,6 +10,6 @@ echo "Building backend image: $backend_image"
 docker build -t "$backend_image" "$repo_root"
 
 echo "Building frontend image: $frontend_image"
-docker build -t "$frontend_image" -f "$repo_root/langchainUI/dockerfile" "$repo_root/langchainUI"
+docker build -t "$frontend_image" -f "$repo_root/langchainUI/Dockerfile" "$repo_root/langchainUI"
 
 echo "OK: Built images"
