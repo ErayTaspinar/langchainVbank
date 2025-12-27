@@ -18,7 +18,7 @@
   "editable": true,
   "fiscalYearStartMonth": 0,
   "graphTooltip": 0,
-  "id": 0,
+  "id": 1,
   "links": [],
   "panels": [
     {
@@ -112,7 +112,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -207,7 +207,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -315,7 +315,7 @@
           "sort": "none"
         }
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -324,12 +324,12 @@
           },
           "editorMode": "code",
           "expr": "sum(rate(process_cpu_seconds_total{}[5m]))",
-          "legendFormat": "{{label_name}} CPU process",
+          "legendFormat": "{{label_name}} Received Bytes Total",
           "range": true,
           "refId": "A"
         }
       ],
-      "title": "Traffic CPU Load",
+      "title": "Traffic Load (Network Receive)",
       "type": "timeseries"
     },
     {
@@ -382,7 +382,7 @@
         "showHeader": true,
         "sortBy": []
       },
-      "pluginVersion": "12.3.0",
+      "pluginVersion": "12.3.1",
       "targets": [
         {
           "datasource": {
@@ -452,5 +452,5 @@
   "timezone": "",
   "title": "Langchain",
   "uid": "app-stack-monitor-v1",
-  "version": 3
+  "version": 1
 }
